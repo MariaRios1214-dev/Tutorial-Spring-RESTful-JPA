@@ -2,6 +2,8 @@ package com.example.payroll;
 
 
 
+import org.springframework.hateoas.CollectionModel;
+import org.springframework.hateoas.EntityModel;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -11,6 +13,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.stream.Collectors;
+
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
 
 
 @RestController
@@ -22,23 +28,35 @@ class EmployeeController {
         this.repository = repository;
     }
 
+    @GetMapping("/employees/{id}")
+    EntityModel<Employee> oneEmployee(@PathVariable Long id) {
+
+        Employee employee = repository.findById(id) //
+                .orElseThrow(() -> new EmployeeNotFoundException(id));
+
+        return EntityModel.of(employee, //
+                linkTo(methodOn(EmployeeController.class).oneEmployee(id)).withSelfRel(),
+                linkTo(methodOn(EmployeeController.class).all()).withRel("employees"));
+    }
+
+
     @GetMapping("/employees")
-    List<Employee> all(){
-        return repository.findAll();
+    CollectionModel<EntityModel<Employee>> all(){
+        List<EntityModel<Employee>> employess = repository.findAll().stream()
+                .map(employee -> EntityModel.of(employee,
+                        linkTo(methodOn(EmployeeController.class).oneEmployee(employee.getId())).withSelfRel(),
+                        linkTo(methodOn(EmployeeController.class).all()).withRel("employess")))
+                .collect(Collectors.toList());
+        return CollectionModel.of(employess,
+                linkTo(methodOn(EmployeeController.class).all()).withSelfRel()
+        );
+
     }
 
     @PostMapping("/employees")
     Employee newEmployee(@RequestBody Employee newEmployee){
         return  repository.save(newEmployee);
     }
-
-    @GetMapping("/employees/{id}")
-    Employee one(@PathVariable Long id){
-
-        return repository.findById(id)
-                .orElseThrow(() -> new EmployeeNotFoundException(id));
-    }
-
 
     @PutMapping("employees/{id}")
     Employee replaceEmployee(@RequestBody Employee newEmployee, @PathVariable Long id){
